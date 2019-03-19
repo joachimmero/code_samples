@@ -128,6 +128,8 @@ public class AttackController : MonoBehaviour
     //Private methods
     
     //Shoot raycasts from this GameObject
+    //Check if a ray collides with the enmy.
+    //Add a point to the player and push player away
     private void ShootRays()
     {
         for(int i = 0; i < mesh.vertices.Length; i = i + 3)
