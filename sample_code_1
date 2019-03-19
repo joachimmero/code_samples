@@ -1,0 +1,268 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Movement : MonoBehaviour
+{
+    //Public properties
+    public Rigidbody rb;
+
+    //Private properties
+    private bool grounded = true;
+    private string player_tag;
+    private float input_attack;
+    private float input_jump;
+    private Vector2 input_move;
+    private Vector3 look_vector;
+    private Vector3 velocity;
+    private Vector3 vel; //For SmoothDamp
+    private AttackController ac;
+   
+    [SerializeField] private float moveSpeed = 3;
+    [SerializeField] private float jumpForce = 5;
+
+    // Start is called before the first frame update
+    void Start()
+    {
+        player_tag = transform.tag;
+        ac = transform.GetChild(0).GetChild(0).GetComponent<AttackController>();
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        input_move = new Vector2(Input.GetAxisRaw(player_tag + "_Horizontal"), Input.GetAxisRaw(player_tag + "_Vertical"));
+        input_attack = Input.GetAxisRaw(player_tag + "_attack");
+        input_jump = Input.GetAxisRaw(player_tag + "_Jump");
+
+        if(grounded)
+        {
+            moveSpeed = 3;
+        }
+        else if(grounded && moveSpeed > 0.02f)
+        {
+            moveSpeed -= 0.02f;
+        }
+    }
+    private void FixedUpdate()
+    {
+        rb.velocity = new Vector3(input_move.x * moveSpeed, rb.velocity.y, input_move.y * moveSpeed);
+        //Vector3.SmoothDamp(transform.eulerAngles, new Vector3(0, look_angle, 0), ref velocity, 0.1f);
+
+        if (rb.velocity != Vector3.zero)
+        {
+            look_vector = Vector3.SmoothDamp(look_vector, new Vector3(rb.velocity.x, 0, rb.velocity.z), ref vel, 0.1f);
+        }
+
+        //If the player pressed the attack button.
+        if (input_attack > 0)
+        {
+            ac.Attack();
+        }
+
+        //If the player pressed the jump button and is not on the ground.
+        else if(input_jump > 0 && grounded)
+        {
+            grounded = false;
+            print("Jump!");
+            rb.AddForce(transform.up * jumpForce, ForceMode.Impulse);
+        }
+
+        transform.rotation = Quaternion.LookRotation(look_vector);
+    }
+
+    private void OnCollisionStay(Collision collision)
+    {
+        if (collision.transform.tag == "ground")
+        {
+            grounded = true;
+        }
+    }
+}
+
+
+
+using System.Collections;
+using UnityEngine;
+
+public class AttackController : MonoBehaviour
+{
+    //Private properties
+    private bool attacking = false;
+    private Mesh mesh;
+    private Vector3 vertices;
+    private Vector3 normals;
+    private UI_Controller uc;
+    private GameController gc;
+    private Animator animator;
+
+    [SerializeField] int force;
+    [SerializeField] Transform player;
+
+    // Start is called before the first frame update
+    void Start()
+    {
+        mesh = GetComponent<MeshFilter>().mesh;
+        animator = transform.parent.GetComponent<Animator>();
+        uc = GameObject.FindObjectOfType<UI_Controller>();
+        gc = GameObject.FindObjectOfType<GameController>();
+    }
+
+    private void FixedUpdate()
+    {
+        if (attacking)
+        {
+            ShootRays();
+        }
+    }
+
+    //Public methods
+
+    public void Attack()
+    {
+        attacking = true;
+        animator.SetBool("attacking", true);
+        StartCoroutine(AttackCoroutine());
+    }
+
+    //Private methods
+    
+    //Shoot raycasts from this GameObject
+    private void ShootRays()
+    {
+        for(int i = 0; i < mesh.vertices.Length; i = i + 3)
+        {
+            RaycastHit hit;
+
+            if (Physics.Raycast(transform.TransformPoint(mesh.vertices[i]), transform.TransformDirection(mesh.normals[i]), out hit, 0.2f))
+            {
+                if (hit.transform != transform.parent.parent && hit.transform.gameObject.layer == 9)
+                {
+                    Vector3 v = transform.TransformDirection(mesh.normals[i] * force);
+                    gc.AddPoint(player.tag);
+                    hit.transform.GetComponent<Rigidbody>().AddForce(new Vector3(v.x,5,v.z), ForceMode.Impulse);
+                    attacking = false;
+                    break;
+                }
+            }
+        }
+    }
+
+    IEnumerator AttackCoroutine()
+    {
+        yield return new WaitForSeconds(0.3f);
+        animator.SetBool("attacking", false);
+        attacking = false;
+    }
+}
+
+
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class UI_Controller : MonoBehaviour
+{
+    //Private properties
+    [SerializeField] Text p1_score_text;
+    [SerializeField] Text p2_score_text;
+    [SerializeField] Text winnerText;
+
+    // Start is called before the first frame update
+    void Start()
+    {
+        p1_score_text.text = "0";
+        p2_score_text.text = "0";
+    }
+
+    //Public methods
+
+    /// <summary>
+    /// Update the score_text of player with tag "playerTag".
+    /// </summary>
+    /// <param name="playerTag"></param>
+    /// <param name="score"></param>
+    public void UpdateScore(string playerTag, int score)
+    {
+        if(playerTag == "p1")
+        {
+            p1_score_text.text = score.ToString();
+        }
+        else
+        {
+            p2_score_text.text = score.ToString();
+        }
+    }
+
+    public void DisplayGameOverText(int winner)
+    {
+        winnerText.gameObject.SetActive(true);
+        winnerText.text = "Player " + winner + " won";
+    }
+}
+
+
+
+using System.Collections;
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+
+public class GameController : MonoBehaviour
+{
+    //Private properties
+    private int p1_score;
+    private int p2_score;
+    private UI_Controller uc;
+    private Text winnerText; 
+
+    // Start is called before the first frame update
+    void Start()
+    {
+        uc = GameObject.FindObjectOfType<UI_Controller>();
+        winnerText = uc.transform.Find("winner").GetComponent<Text>();
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        if(p1_score == 10)
+        {
+            StartCoroutine("GameOver", (object)1);
+        }
+        else if(p2_score == 10)
+        {
+            StartCoroutine("GameOver", (object)2);
+
+        }
+    }
+
+    //Public methods
+
+    /// <summary>
+    /// Add a point to the player with tag "playerTag".
+    /// </summary>
+    /// <param name="playerTag"></param>
+    public void AddPoint(string playerTag)
+    {
+        if (playerTag == "p1")
+        {
+            p1_score++;
+            uc.UpdateScore(playerTag, p1_score);
+        }
+        else
+        {
+            p2_score++;
+            uc.UpdateScore(playerTag, p1_score);
+        }
+    }
+
+    IEnumerator GameOver(int winner)
+    {
+        uc.DisplayGameOverText(winner);
+        yield return new WaitForSeconds(3f);
+        SceneManager.LoadScene(0);
+    }
+}
