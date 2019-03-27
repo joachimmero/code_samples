@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class Movement : MonoBehaviour
@@ -9,9 +7,13 @@ public class Movement : MonoBehaviour
 
     //Private properties
     private bool grounded = true;
+    private bool attacked = false;
+    private bool knocked = false;
     private string player_tag;
     private float input_attack;
     private float input_jump;
+    private float turn_speed;
+    private float temp_rot_y;
     private Vector2 input_move;
     private Vector3 look_vector;
     private Vector3 velocity;
@@ -26,6 +28,7 @@ public class Movement : MonoBehaviour
     {
         player_tag = transform.tag;
         ac = transform.GetChild(0).GetChild(0).GetComponent<AttackController>();
+        temp_rot_y = transform.localEulerAngles.y;
     }
 
     // Update is called once per frame
@@ -46,8 +49,10 @@ public class Movement : MonoBehaviour
     }
     private void FixedUpdate()
     {
-        rb.velocity = new Vector3(input_move.x * moveSpeed, rb.velocity.y, input_move.y * moveSpeed);
-        //Vector3.SmoothDamp(transform.eulerAngles, new Vector3(0, look_angle, 0), ref velocity, 0.1f);
+        if(grounded)
+        {
+            rb.velocity = new Vector3(input_move.x * moveSpeed, rb.velocity.y, input_move.y * moveSpeed);
+        }
 
         if (rb.velocity != Vector3.zero)
         {
@@ -55,9 +60,14 @@ public class Movement : MonoBehaviour
         }
 
         //If the player pressed the attack button.
-        if (input_attack > 0)
+        if (input_attack > 0 && !attacked)
         {
+            attacked = true;
             ac.Attack();
+        }
+        else if(input_attack <= 0)
+        {
+            attacked = false;
         }
 
         //If the player pressed the jump button and is not on the ground.
@@ -67,16 +77,57 @@ public class Movement : MonoBehaviour
             print("Jump!");
             rb.AddForce(transform.up * jumpForce, ForceMode.Impulse);
         }
-
+        
         transform.rotation = Quaternion.LookRotation(look_vector);
+        //Calculate the player's turning speed
+        if(transform.localEulerAngles.y > temp_rot_y)
+        {
+            temp_rot_y = temp_rot_y + 360f;
+        }
+    
+        turn_speed = temp_rot_y - transform.localEulerAngles.y;
+        temp_rot_y = transform.localEulerAngles.y;
+        
     }
 
-    private void OnCollisionStay(Collision collision)
+    private void OnCollisionEnter(Collision collision)
     {
         if (collision.transform.tag == "ground")
         {
             grounded = true;
         }
+    }
+
+    //Private methods:
+
+    private void KnockMe(Vector3 dir)
+    {
+        grounded = false;
+        rb.AddForce(dir, ForceMode.Impulse);
+    }
+
+    //Public methods:
+
+    public void KnockPlayer(Vector3 dir)
+    {
+        KnockMe(dir);
+    }
+
+    public float GetAngularVelocity()
+    {
+        if(turn_speed > 300)
+        {
+            return 0f;
+        }
+        else
+        {
+            return turn_speed;
+        }
+    }
+
+    public Vector3 GetVelocity()
+    {
+        return rb.velocity;
     }
 }
 
@@ -88,51 +139,61 @@ using UnityEngine;
 public class AttackController : MonoBehaviour
 {
     //Private properties
+    private bool attack = false;
     private bool attacking = false;
     private Mesh mesh;
     private Vector3 vertices;
     private Vector3 normals;
     private UI_Controller uc;
     private GameController gc;
+    private Movement m;
+    private ArmScript a;
     private Animator animator;
+    private Transform player;
 
-    [SerializeField] int force;
-    [SerializeField] Transform player;
+    [SerializeField] float force;
 
     // Start is called before the first frame update
     void Start()
     {
+        player = transform.parent.parent.transform;
         mesh = GetComponent<MeshFilter>().mesh;
         animator = transform.parent.GetComponent<Animator>();
         uc = GameObject.FindObjectOfType<UI_Controller>();
         gc = GameObject.FindObjectOfType<GameController>();
+        m = player.GetComponent<Movement>();
+        a = transform.parent.GetComponent<ArmScript>();
     }
-
+    
     private void FixedUpdate()
     {
-        if (attacking)
+        float player_turn_speed = m.GetAngularVelocity() / 5;
+        float arm_turn_speed = a.GetAngularVelocity() / 5;
+        force = arm_turn_speed + player_turn_speed;
+        if (attack)
         {
             ShootRays();
         }
     }
-
+    
     //Public methods
 
     public void Attack()
     {
-        attacking = true;
-        animator.SetBool("attacking", true);
-        StartCoroutine(AttackCoroutine());
+        if(!animator.GetCurrentAnimatorStateInfo(0).IsName("Attack"))
+        {
+            attack = true;
+            animator.SetBool("attacking", true);
+            StartCoroutine(AttackCoroutine());
+        }
     }
 
     //Private methods
     
     //Shoot raycasts from this GameObject
-    //Check if a ray collides with the enmy.
-    //Add a point to the player and push player away
     private void ShootRays()
     {
-        for(int i = 0; i < mesh.vertices.Length; i = i + 3)
+        for (int i = 0; i < mesh.vertices.Length; i = i + 3)
         {
             RaycastHit hit;
 
@@ -140,10 +201,10 @@ public class AttackController : MonoBehaviour
             {
                 if (hit.transform != transform.parent.parent && hit.transform.gameObject.layer == 9)
                 {
-                    Vector3 v = transform.TransformDirection(mesh.normals[i] * force);
+                    Vector3 v = transform.TransformDirection(mesh.normals[i].x * force, force, mesh.normals[i].z * force);
                     gc.AddPoint(player.tag);
-                    hit.transform.GetComponent<Rigidbody>().AddForce(new Vector3(v.x,5,v.z), ForceMode.Impulse);
-                    attacking = false;
+                    hit.transform.GetComponent<Movement>().KnockPlayer(v);
+                    attack = false;
                     break;
                 }
             }
@@ -154,14 +215,11 @@ public class AttackController : MonoBehaviour
     {
         yield return new WaitForSeconds(0.3f);
         animator.SetBool("attacking", false);
-        attacking = false;
+        attack = false;
     }
 }
 
 
-
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -257,7 +315,7 @@ public class GameController : MonoBehaviour
         else
         {
             p2_score++;
-            uc.UpdateScore(playerTag, p1_score);
+            uc.UpdateScore(playerTag, p2_score);
         }
     }
 
@@ -268,3 +326,43 @@ public class GameController : MonoBehaviour
         SceneManager.LoadScene(0);
     }
 }
+
+
+
+using UnityEngine;
+
+public class CameraScript : MonoBehaviour
+{
+    //Private properties
+    private Vector3 velPos;
+    private Vector3 velRot;
+    private Vector3 playersCenter;
+    [SerializeField] Transform p1;
+    [SerializeField] Transform p2;
+
+    private void FixedUpdate()
+    {
+        //Calculates the center point of the players
+        playersCenter = new Vector3((p1.position.x + p2.position.x) / 2, 0.25f, ((p1.position.z + p2.position.z) / 2));
+
+        //Calculates the distance between the players
+        float playersDistance = Mathf.Sqrt(Mathf.Pow((p1.position.x - p2.position.x), 2f) + Mathf.Pow((p1.position.y - p2.position.y), 2f) + Mathf.Pow((p1.position.z - p2.position.z), 2f)) / 14f;
+
+        //Makes the camera follow the center point of the players
+        this.transform.position = Vector3.SmoothDamp(
+            this.transform.position,
+            new Vector3(playersCenter.x, Mathf.Lerp(5f, 8f, playersDistance), Mathf.Lerp(playersCenter.z - 4f, playersCenter.z - 7f, playersDistance)),
+            ref velPos,
+            0.3f
+            );
+
+        //Rotates the camera so that it always shows all of the player on screen.
+        this.transform.eulerAngles = Vector3.SmoothDamp(
+            this.transform.eulerAngles,
+            new Vector3(Mathf.Lerp(47f, 50f, playersDistance), 0, 0),
+            ref velRot,
+            0.3f
+            );
+    }
+}
+
