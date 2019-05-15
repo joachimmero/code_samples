@@ -1,0 +1,306 @@
+//A HUB FOR ROOM CREATIONS, JOINING ROOMS AND FETCHING A LIST OF THE ROOMS ON THE SERVER
+
+void StartHub(SOCKET c)
+{
+	int iResult = 0;
+	int iSendResult = 0;
+	//Create a new SOCKET pointer and copy the info of "c" to it.
+	SOCKET* client = new SOCKET;
+	*client = c;
+	//First element is to check whether the client wants to create or join a room.
+	//The last element is the size of the room.
+	//Everything in the middle is the name of the room.
+
+	//Create a character array for the server connection callback.
+	//The first four elements are a unsigned int of the value 1 in bytes,
+	//and they represent the length of the callback-array - the first four bytes.
+	//The last byte is a flag that indicates that the connection to the server was succesfull.
+	char callback[5] = { 1, 0, 0, 0, 's' };
+
+	//Send a callback to the client, that indicates a succesfull connection to the server.
+	iSendResult = send(*client, callback, 5, 0);
+
+	unsigned int success;
+	//[0] = 0 -> Create Room or 1 -> Join Room
+	//[1] - [last - 1] Room Name
+	//[last] Max players in room
+
+	//Loop as long as the client hasn't succesfully created or joined a room.
+	do
+	{
+		//Signed char eli -127 - 127
+		char nextbuflen[4];
+		//Vastaanota clientiltä bitteinä integer, joka määrittelee kuinka pitkä seuraava streami tulee olemaan.
+		iResult = recv(*client, nextbuflen, 4, 0);
+		//Check if the recv-function returned an error.
+		success = checkRecvErrors(iResult, client);
+		if (success != 0)
+		{
+			success = 0;
+			//TEMP: muuta -> unsigned int* buflen = (unsigned int*)&nextbuflen;
+			//This is the length of the next stream to be received.
+			unsigned int* buflen = (unsigned int*)&nextbuflen[0];
+			//First element is a flag (0 = Create Room, 1 = Join Room, 2 = Get room list.
+			//If flag = 0 or 1, elements 1...4 are the length of the clients name in bytes.
+			//If flag = 0 or 1 elements 5...namelen - 1 are the clients name in characters.
+			//If flag = 0 or 1 elements namelen...buflen - 2 are the rooms name in characters.
+			//If flag = 0 the last element is the maximum number of players in the room.
+			char recvbuf[127];
+			iResult = recv(*client, recvbuf, *buflen, 0);
+			//Check if the recv-function returned an error.
+			success = checkRecvErrors(iResult, client);
+			if (success != 0)
+			{
+				success = 0;
+
+				if (recvbuf[0] == '2')
+				{
+					//Check the amount of rooms on the server and
+					//convert it to a const char (byte) -array.
+					unsigned int count = (unsigned int)rooms->size();
+					const char countbuf[4] = {
+						((const char*)&count)[0],
+						((const char*)&count)[1],
+						((const char*)&count)[2],
+						((const char*)&count)[3]
+					};
+
+					//Send the amount of rooms to the client in bytes.
+					send(*client, countbuf, 4, 0);
+
+					//Send all the rooms to the client.
+					for (auto it = rooms->begin(); it != rooms->end(); it++)
+					{
+						//Get the information of a room.
+						std::string roomname = it->first;
+						unsigned int playerscount = it->second->GetClientCount();
+						unsigned int maxplayers = it->second->maxplayers;
+
+						//The length of the roomname in bytes.
+						//This is sent so that the client knows the length of the next buffer.
+						unsigned int namelen = (unsigned int)roomname.length();
+						char buflen[4] = {
+							((char*)&namelen)[0],
+							((char*)&namelen)[1],
+							((char*)&namelen)[2],
+							((char*)&namelen)[3]
+						};
+						send(*client, buflen, 4, 0);
+
+
+						//TEMP: Change the size of buf to what the real max size is.
+						char buf[50] = {
+							((char*)&playerscount)[0],
+							((char*)&playerscount)[1],
+							((char*)&playerscount)[2],
+							((char*)&playerscount)[3],
+							((char*)&maxplayers)[0],
+							((char*)&maxplayers)[1],
+							((char*)&maxplayers)[2],
+							((char*)&maxplayers)[3]
+						};
+						for (unsigned int i = 8; i < 8 + namelen; i++)
+						{
+							int j = i - 8;
+							buf[i] = roomname.at(j);
+						}
+
+						send(*client, buf, 8 + namelen, 0);
+					}
+					success = 1;
+				}
+				else
+				{
+					//Receive info about how long the name of the client is.
+					char namelenbuf[4];
+					//recv(*client, namelenbuf, 4, 0);
+					unsigned int* namelen = (unsigned int*)&recvbuf[1];
+
+					//clientName-string
+					std::string n;
+					//roomName-string
+					std::string r;
+					unsigned int size = 0;
+
+					//Get all information from the stream. 
+					//Start from index 5, because the first index determines whether
+					//the player is creating ('0') or joining ('1') a room,
+					//and the next four elements determine the length of the clients name.
+
+					//Get client name from the stream
+					for (unsigned int i = 5; i <= 5 + *namelen; i++)
+					{
+						n += recvbuf[i];
+					}
+					for (unsigned int i = 5 + *namelen; i < *buflen - 1; i++)
+					{
+						r += recvbuf[i];
+					}
+					if (recvbuf[0] == '0')
+					{
+						//Cast the last element of the buffer(numeric character=
+						//to an unsigned int.
+						size = (unsigned int)recvbuf[*buflen - 1] - 48;
+						//Check if a room with the name n can be created.
+						//Returns 1 if room couldn't be created
+						//Else returns 0.
+						success = createRoom(client, n, r, size);
+
+						if (success == 1)
+						{
+							unsigned int len = 43;
+							//Create a callback buffer.
+							//First element is a flag to indicate that something failed ("f").
+							//Second element is a flag to indicate that it was room creation that failed ("c")
+							//Rest is the callback message.
+							char buf[47] = {
+								((const char*)&len)[0],
+								((const char*)&len)[1],
+								((const char*)&len)[2],
+								((const char*)&len)[3],
+								'f',
+								'c',
+								'A',' ','r','o','o','m',' ','w','i','t','h',' ','t','h','e',' ','s','a','m','e',' ','n','a','m','e',' ','a','l','r','e','a','d','y',' ','e','x','i','s','t','s','.'
+							};
+
+							//Send the callback to the client.
+							send(c, buf, 47, 0);
+						}
+					}
+					else if (recvbuf[0] == '1')
+					{
+						r += recvbuf[*buflen - 1];
+						//Check if a room with the name n can be joined.
+						//Returns 1 if room couldn't be joined, because it couldn't be found.
+						//Returns 2 if room couldn't be joined, because it was full.
+						//Else returns 0.
+						success = JoinRoom(client, n, r);
+
+						if (success == 1)
+						{
+							unsigned int len = 17;
+							//Create a callback buffer.
+							//First element is a flag to indicate that something failed ("f").
+							//Second element is a flag to indicate that it was joining a room that failed ("j")
+							//Rest is the callback message.
+							char buf[21] =
+							{
+								((const char*)&len)[0],
+								((const char*)&len)[1],
+								((const char*)&len)[2],
+								((const char*)&len)[3],
+								'f',
+								'j',
+								'R','o','o','m',' ','n','o','t',' ','f','o','u','n','d','!'
+							};
+							//Send the callback to the client.
+							send(c, buf, 21, 0);
+						}
+						else if (success == 2)
+						{
+							unsigned int len = 12;
+							//Create a callback buffer.
+							//First element is a flag to indicate that something failed ("f").
+							//Second element is a flag to indicate that it was joining a room that failed ("j")
+							//Rest is the callback message.
+							char buf[16] =
+							{
+								((const char*)&len)[0],
+								((const char*)&len)[1],
+								((const char*)&len)[2],
+								((const char*)&len)[3],
+								'f',
+								'j',
+								'R','o','o','m',' ','f','u','l','l','!'
+							};
+							//Send the callback to the client.
+							send(c, buf, 16, 0);
+						}
+					}
+				}
+			}
+		}	
+	} while (success != 0);
+}
+
+//HANDLING ROOM CREATIONS
+
+unsigned int  createRoom(SOCKET *c, std::string name, std::string roomName, unsigned int roomSize)
+{
+	//Go through all the rooms on the server
+	//and check if a room with the name "name"
+	//exists already.
+	for (auto it = rooms->begin(); it != rooms->end(); it++)
+	{
+		if (it->first == roomName)
+		{
+			return 1;
+		}
+	}
+	//Create a room object with a name and maximum player size.
+	Room *room = new Room(roomName, roomSize);
+	//Creata a pair from the clients socket and the players name.
+	//and add it to the rooms client -container.
+	room->AddClient(std::make_pair(c, name));
+	//Add the roomName and the room-object as a pair to
+	//the rooms-unordered_map.
+	rooms->insert({ roomName, room });
+	//Make a character pointer and point it to the SOCKET c
+	//to get the id of the client in bytes.
+	const char* id = (const char*)c;
+	//Create a callback buffer that holds the information of its length,
+	//the flag c ("Created a room") and the players id.
+	const char callback[9] = { 5, 0, 0, 0, 'c', id[0], id[1], id[2], id[3] };
+	//Send the buffer to the client.
+	int iSendResult1 = send(*c, callback, 9, 0);
+	//"Enter the room"
+	//Start receiving and passing data to other clients
+	//that are connected to the same room.
+	passData(c, room);
+
+	return 0;
+}
+
+//HANDLE ERRORS FROM RECEIVING DATA
+
+int checkRecvErrors(int iResult, SOCKET* client)
+{
+	if (iResult == SOCKET_ERROR)
+	{
+		int error = WSAGetLastError();
+		switch (error)
+		{
+		case WSAETIMEDOUT:
+		case WSAECONNRESET:
+		case WSAECONNABORTED:
+			std::cout
+				<< "Connection lost with client: "
+				<< *client
+				<< ". Closing socket...\n"
+				<< error;
+			break;
+		}
+
+		//Close the socket with which the connection was lost.
+		closesocket(*client);
+		//Delete the SOCKET-object.
+		delete client;
+		//return 0 to indicate that an error occured
+		return 0;
+	}
+	else if (iResult == 0)
+	{
+		printf("Error: " + WSAGetLastError());
+		std::cout
+			<< "Connection closed with client: "
+			<< *client
+			<< std::endl;
+		//Close the socket with which the connection was lost.
+		closesocket(*client);
+		//Delete the SOCKET-object.
+		delete client;
+		//return 0 to indicate that an error occured
+		return 0;
+	}
+	return 1;
+}
