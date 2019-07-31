@@ -1,0 +1,91 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace offline
+{
+    public class Offline_TurretScript : Offline_Offensive_Buildable
+    {
+
+        //Private fields:
+
+        [SerializeField] Transform barrel;
+        [SerializeField] Transform top;
+        [SerializeField] GameObject projectilePrefab;
+
+        private float projectileSpeed = 5f;
+        private bool reloading = false;
+        private Transform target;
+        [SerializeField] private Transform map;
+
+        // Start is called before the first frame update
+        void Start()
+        {
+            top = transform.Find("Top");
+            barrel = top.Find("Barrel");
+            map = GameObject.Find("map").transform;
+        }
+
+        // Update is called once per frame
+        void Update()
+        {
+            if (target != null)
+            {
+                top.transform.LookAt(target);
+                top.transform.eulerAngles = new Vector3(0f, top.transform.eulerAngles.y, 0f);
+                
+                if (!reloading)
+                {
+                    ShootProjectile();
+                }
+            }
+        }
+
+        //Private methods:
+
+        private void ShootProjectile()
+        {
+            //Instantiate the projectile
+            GameObject go = Instantiate(projectilePrefab, barrel.transform.position, Quaternion.identity, map);
+            Offline_ProjectileScipt p = go.GetComponent<Offline_ProjectileScipt>();
+            p.speed = 7.5f;
+            p.target = target;
+            p.damage = damage;
+            p.owner = transform;
+
+            //Reload
+            StartCoroutine(Reload(2f));
+        }
+
+        private void OnTriggerEnter(Collider col)
+        {
+            if (col.gameObject.layer == 9 && target == null)
+            {
+                target = col.transform;
+            }
+        }
+
+        private void OnTriggerStay(Collider col)
+        {
+            if (target == null && col.gameObject.layer == 9)
+            {
+                target = col.transform;
+            }
+        }
+
+        private void OnTriggerExit(Collider col)
+        {
+            if (target != null)
+            {
+                target = null;
+            }
+        }
+
+        IEnumerator Reload(float sec)
+        {
+            reloading = true;
+            yield return new WaitForSeconds(sec);
+            reloading = false;
+        }
+    }
+}

@@ -1,0 +1,136 @@
+using System.Collections;
+using System.Collections.Generic;
+using System;
+using UnityEngine;
+
+namespace offline
+{
+    public class Offline_Movement : MonoBehaviour
+    {
+        //Private fields:
+        [SerializeField]private int playerIndex;
+        private float input_attack;
+        private float input_reset_target;
+        private float input_toggle_targeting;
+        private bool targetingEnabled = true;
+        private bool targeting = false;
+        private bool buildablePicked = false;
+        private Coroutine tempCoroutine;
+        private Vector2 input_move;
+        private Vector3 vel; //for lookVector SmoothDamp
+        private Vector3 lookVector;
+        private GameObject targetingIndicator;
+        private GameObject pickedBuildable;
+        private Transform target = null;
+        private Rigidbody rb;
+        private Offline_PlayerInfo playerInfo;
+        private Offline_GameController gc;
+        private Offline_AttackController ac;
+        private Offline_HubScript hs;
+        private Offline_BuildingScript bs;
+
+        // Start is called before the first frame update
+        void Start()
+        {
+            
+            playerInfo = GetComponent<Offline_PlayerInfo>();
+            playerIndex = int.Parse(gameObject.tag.Substring(1, 1));
+            gc = FindObjectOfType<Offline_GameController>();
+            ac = transform.Find("temp_sword").Find("Blade").GetComponent<Offline_AttackController>();
+            hs = FindObjectOfType<Offline_HubScript>();
+            bs = FindObjectOfType<Offline_BuildingScript>();
+            rb = GetComponent<Rigidbody>();
+            targetingIndicator = transform.Find("Canvas").Find("Targeter").gameObject;
+        }
+
+        void Update()
+        {
+            if (Input.GetButtonDown(gameObject.tag + "_attack"))
+            {
+                if (!bs.BuildableInHand)
+                {
+                    ac.Attack();
+                }
+            }
+            if (Input.GetButtonDown(gameObject.tag + "_toggle_targeting"))
+            {
+                tempCoroutine = StartCoroutine(ToggleTargetingTimer(0.6f));
+            }
+            //If the player presses the reset_target-button
+            if (Input.GetButtonUp(gameObject.tag + "_toggle_targeting"))
+            {
+                if(tempCoroutine != null)
+                {
+                    StopCoroutine(tempCoroutine);
+                    tempCoroutine = null;
+                }
+                if (targetingEnabled)
+                {
+                    ResetTarget();
+                }
+            }
+            
+        }
+
+        // Update is called once per frame
+        void FixedUpdate()
+        {
+            if (target == null)
+            {
+                targeting = false;
+            }
+
+            input_move = new Vector2(Input.GetAxisRaw(playerInfo.tag + "_horizontal"), Input.GetAxisRaw(playerInfo.tag + "_vertical"));
+            
+            //Move the character
+            rb.velocity = new Vector3(input_move.x * playerInfo.speed, rb.velocity.y, input_move.y * playerInfo.speed);
+           
+            if (!targeting && input_move != Vector2.zero)
+            {
+                //Look forward
+                lookVector = Vector3.SmoothDamp(lookVector, new Vector3(transform.position.x + rb.velocity.x, transform.position.y, transform.position.z + rb.velocity.z), ref vel, playerInfo.turnSpeed);
+                transform.LookAt(lookVector);
+            }
+            if (targeting)
+            {
+                transform.LookAt(new Vector3(target.transform.position.x, transform.position.y, target.transform.position.z));
+            }
+        }
+
+        //Public methods:
+
+        //Set a target for the player to lookAt.
+        public void SetTarget(Transform t)
+        {
+            if (targetingEnabled)
+            {
+                targeting = true;
+                target = t;
+            }
+        }
+
+        //Reset the players target to be null.
+        public void ResetTarget()
+        {
+            target = null;
+        }
+
+        //Private methods:
+        private IEnumerator ToggleTargetingTimer(float sec)
+        {
+            yield return new WaitForSeconds(sec);
+            if (targetingEnabled)
+            {
+                targetingIndicator.SetActive(false);
+                targetingEnabled = false;
+                ResetTarget();
+            }
+            else
+            {
+                targetingIndicator.SetActive(true);
+                targetingEnabled = true;
+            }
+        }
+    }
+}
+

@@ -1,0 +1,99 @@
+using System.Collections.Generic;
+using System.Collections;
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+using System;
+
+namespace offline
+{
+    public class Offline_GameController : MonoBehaviour
+    {
+        //Public fields:
+
+        public int p1Resources = 0;
+        public int p2Resources = 0;
+        public Offline_PlayerInfo[] players;
+
+        //Private properties
+        private int round = 1;
+        private int enemyCount = 1;
+
+        [SerializeField] Transform map;
+        [SerializeField] GameObject playerPrefab;
+        [SerializeField] GameObject camera;
+
+        private Offline_ItemManager im;
+        private Offline_UI_Controller uc;
+        private Offline_EnemySpawner es;
+
+        // Start is called before the first frame update
+        void Start()
+        {
+            int playersCount = 2;//Input.GetJoystickNames().Length;
+            players = new Offline_PlayerInfo[playersCount];
+            for (int i = 0; i < playersCount; i++)
+            {
+                Offline_PlayerInfo p = Instantiate(playerPrefab, new Vector3(UnityEngine.Random.Range(-5f, 5f), 0.25f, -30f), Quaternion.identity, map).GetComponent<Offline_PlayerInfo>();
+                p.gameObject.tag = "p" + (i + 1).ToString();
+                players[i] = p;
+            }
+
+            Instantiate(camera, null);
+
+            im = FindObjectOfType<Offline_ItemManager>();
+            uc = GameObject.FindObjectOfType<Offline_UI_Controller>();
+            es = FindObjectOfType<Offline_EnemySpawner>();
+            uc.InitializeUI(players);
+            es.SpawnWave(round);
+        }
+
+        //Public methods
+
+        //Adds x-amount of currency to a player.
+        public void AddResources(int playerIndex, int amount)
+        {
+            Offline_ItemManager temp_im;
+            switch (playerIndex)
+            {
+                case 1:
+                    temp_im = players[0].GetComponent<Offline_ItemManager>();
+                    temp_im.Resources += amount;
+                    uc.UpdateResources(playerIndex, temp_im.Resources);
+                    break;
+                case 2:
+                    temp_im = players[1].GetComponent<Offline_ItemManager>();
+                    temp_im.Resources += amount;
+                    uc.UpdateResources(playerIndex, temp_im.Resources);
+                    break;
+            }
+        }
+
+        //Starts the next round.
+        public void NextRound()
+        {
+            es.SpawnWave(++round);
+            uc.UpdateRound(round);
+            uc.NextRoundSplash();
+        }
+
+        public void CheckPlayerCount()
+        {
+            if (FindObjectsOfType<Offline_PlayerInfo>().Length <= 0)
+            {
+                GameOver();
+            }
+        }
+
+        public void GameOver()
+        {
+            StartCoroutine("CountDown", (object)3f);
+        }
+
+        IEnumerator CountDown(float time)
+        {
+            yield return new WaitForSeconds(time);
+            SceneManager.LoadScene(0);
+        }
+    }
+}

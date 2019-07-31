@@ -1,0 +1,76 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace offline
+{
+    public class Offline_HubScript : MonoBehaviour
+    {
+        //Public properties:
+        public int Hp { get; set; } = 10;
+        public int MaxHp { get; set;  } = 10;
+
+        //Private properties
+        private readonly int maxPlayerHp = 10;
+        private Offline_UI_Controller uc;
+        private Offline_GameController gc;
+        [SerializeField]private List<Transform> onPerimiter;
+
+        private void Start()
+        {
+            gc = FindObjectOfType<Offline_GameController>();
+            uc = FindObjectOfType<Offline_UI_Controller>();
+            onPerimiter = new List<Transform>();
+        }
+        //Public methods
+
+        public void Damage(int damageAmount)
+        {
+            TakeDamage(damageAmount);
+        }
+
+        public Offline_BuildingStore OpenBuildMenu(int playerIndex)
+        {
+            return uc.DisplayBuildMenu(playerIndex);
+        }
+
+        public void CloseBuildMenu(int playerIndex)
+        {
+            uc.CloseBuildPanel(playerIndex);
+        }
+
+        //Private methods
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            if (collision.gameObject.layer == 9)
+            {
+                //Take "power" amount of damage when enemy hits the this transform.
+                TakeDamage(collision.gameObject.GetComponent<Offline_EnemyController>().power);
+                collision.gameObject.GetComponent<Offline_EnemyController>().DestroyEnemy();
+            }
+
+        }
+        
+        private void TakeDamage(int damageAmount)
+        {
+            if (Hp - damageAmount <= 0)
+            {
+                Hp -= damageAmount;
+                uc.UpdateHubHp(Hp, MaxHp);
+                GameOver();
+            }
+            else
+            {
+                Hp -= damageAmount;
+                uc.UpdateHubHp(Hp, MaxHp);
+            }
+        }
+
+        private void GameOver()
+        {
+            gc.GameOver();
+        }
+    }
+}
+

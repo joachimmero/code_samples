@@ -1,0 +1,89 @@
+using System.Collections;
+using System;
+using UnityEngine;
+
+namespace offline
+{
+    public class Offline_AttackController : MonoBehaviour
+    {
+        //Private properties
+        [SerializeField]private int playerIndex;
+        private int attackPower = 5;
+        private bool attack = false;
+        private bool attacking = false;
+        private Offline_UI_Controller uc;
+        private Offline_GameController gc;
+        private Offline_Movement m;
+        private Animator animator;
+        private Transform player;
+
+        [SerializeField] float force;
+        [SerializeField] BoxCollider boxCollider;
+        // Start is called before the first frame update
+        void Start()
+        {
+            player = transform.parent.parent.transform;
+            //mesh = GetComponent<MeshFilter>().mesh;
+            animator = transform.parent.GetComponent<Animator>();
+            uc = FindObjectOfType<Offline_UI_Controller>();
+            gc = FindObjectOfType<Offline_GameController>();
+            m = player.GetComponent<Offline_Movement>();
+            boxCollider = GetComponent<BoxCollider>();
+
+            switch (transform.parent.parent.tag.Substring(1, 1))
+            {
+                case "1":
+                    playerIndex = 1;
+                    break;
+                case "2":
+                    playerIndex = 2;
+                    break;
+            }
+        }
+
+        private void FixedUpdate()
+        {
+
+        }
+
+        //Public methods
+
+        public void Attack()
+        {
+            if (!animator.GetCurrentAnimatorStateInfo(0).IsName("Attack"))
+            {
+                attack = true;
+                animator.SetBool("attacking", true);
+                StartCoroutine(AttackCoroutine());
+            }
+        }
+
+        //Private methods
+
+        private void OnCollisionEnter(Collision col)
+        {
+            if (attack)
+            {
+                if (col.gameObject.layer == 9)
+                {
+                    Offline_EnemyController ec = col.gameObject.GetComponent<Offline_EnemyController>();
+                    boxCollider.enabled = false;
+                    player.GetComponent<Offline_Movement>().SetTarget(col.transform);
+                    int res = ec.KnockPlayer(new Vector3(player.forward.x, 0.5f, player.forward.z) * 5, attackPower);
+                    if (res != 0)
+                    {
+                        gc.AddResources(playerIndex, res);
+
+                    }
+                }
+            }
+        }
+        IEnumerator AttackCoroutine()
+        {
+            yield return new WaitForSeconds(0.5f);
+            animator.SetBool("attacking", false);
+            attack = false;
+            boxCollider.enabled = true;
+        }
+    }
+}

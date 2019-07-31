@@ -1,0 +1,196 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.AI;
+
+namespace offline
+{
+    public class Offline_EnemyController : MonoBehaviour
+    {
+        //Public properties:
+        public int power;
+        public NavMeshAgent agent;
+        public Transform hub;
+        public float speed;
+
+        //Private properties:
+        private int hp = 10;
+        [SerializeField] private int value;
+        private bool tooClose = false;
+        private bool stunned = false;
+        private readonly int maxhp = 10;
+        [SerializeField] int[] aggroLayers =  { 10, 12 };
+        [SerializeField] Transform target;
+        private Transform sword;
+        private Rigidbody rb;
+        private Vector3 vel;
+        private Offline_GameController gc;
+        private Offline_EnemyAttackController ac;
+        private Animator animator;
+        [SerializeField] private Mesh mesh;
+
+
+
+        // Start is called before the first frame update
+        void Start()
+        {
+            gc = FindObjectOfType<Offline_GameController>();
+            rb = GetComponent<Rigidbody>();
+            agent.updatePosition = false;
+
+            if (tag == "enemy_swordman")
+            {
+                ac = transform.Find("temp_sword").Find("Blade").GetComponent<Offline_EnemyAttackController>();
+                power = 5;
+                value = 20;
+            }
+            else if (tag == "enemy_minion")
+            {
+                power = 1;
+                value = 5;
+            }
+
+        }
+
+        //Private methods:
+        private void Update()
+        {
+            if(target == null)
+            {
+                agent.destination = hub.position;
+            }
+            print(agent.destination);
+            transform.LookAt(new Vector3(agent.steeringTarget.x, 0.25f, agent.steeringTarget.z));
+            if (!stunned)
+            {
+                if (!tooClose)
+                {
+                    transform.Translate(transform.forward * speed * Time.deltaTime, Space.World);
+
+                    //Vector3 dir = (agent.steeringTarget - transform.position).normalized;
+                    //Make the agent be always a little ahead of this transform so that the player doesn't shake in corners.
+                    agent.nextPosition = transform.position + transform.forward * 0.5f;
+                }
+                //Check how far the target is, if it's close enough.. Attack
+                if (target != null && Vector3.Distance(transform.position, target.position) < 1f)
+                {
+                    tooClose = true;
+
+                    if (!ac.cd)
+                    {
+                        ac.Attack();
+                    }
+                }
+                else
+                {
+                    tooClose = false;
+                }
+            }
+        }
+
+
+        private int KnockMe(Vector3 dir, int damage)
+        {
+            rb.AddForce(dir, ForceMode.Impulse);
+            if (hp - damage > 0)
+            {
+                hp -= damage;
+                StartCoroutine(Stunned(1f));
+                return 0;
+            }
+            else
+            {
+                hp = 0;
+                GetDestroyed();
+                return value;
+            }
+        }
+
+        IEnumerator Stunned(float sec)
+        {
+            stunned = true;
+            yield return new WaitForSeconds(sec);
+            stunned = false;
+        }
+
+        private void GetDestroyed()
+        {
+            if (FindObjectsOfType<Offline_EnemyController>().Length == 1)
+            {
+                gc.NextRound();
+            }
+            Destroy(this.gameObject);
+        }
+
+        private void OnCollisionEnter(Collision col)
+        {
+            if (col.gameObject.layer == 11)
+            {
+                Offline_ProjectileScipt projectile = col.gameObject.GetComponent<Offline_ProjectileScipt>();
+                if (hp - projectile.damage > 0)
+                {
+                    hp -= projectile.damage;
+                    StartCoroutine(Stunned(1f));
+                }
+                else
+                {
+                    hp = 0;
+                    gc.AddResources(projectile.owner.GetComponent<Offline_Buildable>().owner.GetComponent<Offline_PlayerInfo>().PlayerIndex, value);
+                    GetDestroyed();
+                }
+
+                Destroy(col.gameObject);
+            }
+        }
+
+        private void OnTriggerEnter(Collider col)
+        {
+            if (tag != "enemy_minion")
+            {
+                for(int i = 0; i < aggroLayers.Length; i++)
+                {
+                    if(col.gameObject.layer == aggroLayers[i])
+                    {
+                        print("Aggro!");
+                        target = col.transform;
+                    }
+                }
+            }
+        }
+
+        private void OnTriggerStay(Collider col)
+        {
+            if (tag != "enemy_minion")
+            {
+                if (target != null && col.transform == target)
+                {
+                    agent.destination = target.transform.position;
+                }
+            }
+        }
+
+        private void OnTriggerExit(Collider col)
+        {
+            if (tag != "enemy_minion")
+            {
+                if (target != null && col.transform == target)
+                {
+                    target = null;
+                }
+                agent.destination = hub.position;
+            }
+        }
+
+        //Public methods:
+
+        public void DestroyEnemy()
+        {
+            GetDestroyed();
+        }
+
+        public int KnockPlayer(Vector3 dir, int damage)
+        {
+            return KnockMe(dir, damage);
+        }
+    }
+}

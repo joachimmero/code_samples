@@ -1,0 +1,26 @@
+using UnityEngine;
+
+namespace offline
+{
+    public class Offline_Buildable : MonoBehaviour
+    {
+        //Public fields:
+        public int price;
+        public Transform owner;
+        public Sprite image;
+
+        //Public properties:
+        public int Hp { get; set; }
+    }
+
+    public class Offline_Offensive_Buildable : Offline_Buildable
+    {
+        //Public fields:
+        public int damage;
+    }
+
+    public class Defencive_Buildable : Offline_Buildable
+    {
+
+    }
+}

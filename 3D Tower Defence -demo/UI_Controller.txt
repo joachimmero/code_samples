@@ -1,0 +1,160 @@
+using System.Collections;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace offline
+{
+    public class Offline_UI_Controller : MonoBehaviour
+    {
+        //Private properties
+        [SerializeField] Text nextRound;
+        [SerializeField] Text roundText;
+        [SerializeField] Text hpText;
+        [SerializeField] Slider hpSlider;
+        [SerializeField] Slider[] playerHpSliders;
+        [SerializeField] Text[] playerHpTexts;
+        [SerializeField] Text[] playerResourceTexts;
+        [SerializeField] Offline_BuildingStore[] buildMenus;
+        [SerializeField] GameObject playerUIPrefab;
+        [SerializeField] GameObject buildMenuPrefab;
+
+        private Image[,] buildMenuSlots;
+        
+        private Offline_HubScript hs;
+        
+        //Public methods
+
+        //Initialize the UI.
+        public void InitializeUI(Offline_PlayerInfo[] players)
+        {
+            roundText.text = "ROUND 1";
+
+            hs = FindObjectOfType<Offline_HubScript>();
+            hpText.text = hs.Hp + "/" + hs.MaxHp;
+            hpSlider.maxValue = hs.MaxHp;
+            hpSlider.value = hs.Hp;
+            
+            //Initialize player UI arrays.
+            playerHpSliders = new Slider[players.Length];
+            playerHpTexts = new Text[players.Length];
+            playerResourceTexts = new Text[players.Length];
+            buildMenus = new Offline_BuildingStore[players.Length];
+            buildMenuSlots = new Image[players.Length, 4];
+
+            //TEMP: Toimii, mutta tee xpos laskusta selkeämpi, jos mahdollista.
+            Transform playerUIs = transform.Find("PlayerUIs");
+            Transform buildMenuPlaceHolder = transform.Find("BuildMenus");
+            for(int i = 0; i < players.Length; i++)
+            {
+                float xpos = (800 / players.Length * (i + 1)) - (800/players.Length) / players.Length;
+                //TEMP: Purkkaaaa!!!
+                if(players.Length == 1)
+                {
+                    xpos = 400;
+                }
+                //Instantiate player UI.
+                Transform ui = Instantiate(playerUIPrefab, playerUIs).transform;
+                ui.localPosition = new Vector3(xpos, 0f, 0f);
+                //Initialize the ui.
+                playerHpSliders[i] = ui.Find("PlayerHpSlider").GetComponent<Slider>();
+                playerHpTexts[i] = playerHpSliders[i].transform.Find("Fill Area").GetChild(1).GetComponent<Text>();
+                playerResourceTexts[i] = ui.Find("PlayerResourcesText").GetComponent<Text>();
+                playerResourceTexts[i].text = "Resources " + players[i].GetComponent<Offline_ItemManager>().Resources;
+                ui.Find("PlayerIndicatorText").GetComponent<Text>().text = "Player " + (i + 1).ToString() + " HP";
+                //Instantiate build menu.
+                Transform bm = Instantiate(buildMenuPrefab, buildMenuPlaceHolder).transform;
+                bm.localPosition = new Vector3(xpos, 0f, 0f);
+
+                buildMenus[i] = bm.GetComponent<Offline_BuildingStore>();
+                //Initialize build menu slots.
+                for(int l = 0; l < 4; l++)
+                {
+                    buildMenuSlots[i, l] = bm.GetChild(l).GetComponent<Image>();
+                }
+                Offline_BuildingStore bs = bm.GetComponent<Offline_BuildingStore>();
+                //Add the correct images to the slots.
+                for(int j = 0; j < bs.buildables.Count; j++)
+                {
+                    //bm has childen that are Image-objects. Set the j:th objects sprite
+                    //to be the image of a buildable.
+                    Image slotImage = bm.GetChild(j).GetComponent<Image>();
+                    slotImage.sprite = bs.buildables[j].GetComponent<Offline_Buildable>().image;
+
+                    buildMenuSlots[i,j] = slotImage;
+                }
+                //Add the correct colors to the slots.
+                for(int k = 0; k < bs.BuildablesCount; k++)
+                {
+                    buildMenuSlots[i,k].color = Color.grey;
+                }
+
+                buildMenuSlots[i,0].color = Color.white;
+
+                buildMenus[i].gameObject.SetActive(false);
+            }
+        }
+
+        //Updates a players resource amount
+        public void UpdateResources(int playerIndex, int amount)
+        {
+            playerResourceTexts[playerIndex - 1].text = "Resources: " + amount.ToString();
+        }
+
+        //Update the current round to the UI.
+        public void UpdateRound(int round)
+        {
+            roundText.text = "ROUND " + round;
+        }
+
+        //Update the current hp of the hub to the UI.
+        public void UpdateHubHp(int hp, int maxHp)
+        {
+            hpText.text = hp + "/" + maxHp;
+            hpSlider.value = hp;
+        }
+
+        public void UpdatePlayerHp(int playerIndex, int hp)
+        {
+            playerHpSliders[playerIndex - 1].value = hp;
+            playerHpTexts[playerIndex - 1].text = hp + "/" + playerHpSliders[playerIndex - 1].maxValue;
+        }
+
+        public Offline_BuildingStore DisplayBuildMenu(int playerIndex)
+        {
+            buildMenus[playerIndex - 1].gameObject.SetActive(true);
+            return buildMenus[playerIndex - 1];
+        }
+
+        public void CloseBuildPanel(int playerIndex)
+        {
+            buildMenus[playerIndex - 1].gameObject.SetActive(false);
+        }
+
+        public void SetBuildMenuCursor(int playerIndex, int index)
+        {
+            print(index);
+            for(int i = 0; i < buildMenus[playerIndex - 1].BuildablesCount; i++)
+            {
+                if (i != index)
+                {
+                    buildMenuSlots[playerIndex - 1,i].color = Color.grey;
+                }
+            }
+            buildMenuSlots[playerIndex - 1,index].color = Color.white;
+        }
+
+        //Display info that a new round starts.
+        public void NextRoundSplash()
+        {
+            StartCoroutine(Splash(nextRound.gameObject, 3f));
+        }
+
+        //Private methods:
+        private IEnumerator Splash(GameObject obj, float sec)
+        {
+            obj.SetActive(true);
+            yield return new WaitForSeconds(sec);
+            obj.SetActive(false);
+        }
+    }
+}

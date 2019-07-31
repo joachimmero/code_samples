@@ -1,0 +1,46 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace offline
+{
+    public class Offline_PlayerInfo : MonoBehaviour
+    {
+
+        //Public properties:
+
+        //Return the tag of the player-gameObject;
+        public int PlayerIndex
+        {
+            get
+            {
+                return playerIndex;
+            }
+        }
+
+        //Public fields:
+
+        [Header("Player Stats")]
+        public int hp;
+        public int stamina;
+        public int damage;
+        public int defence;
+        public float speed;
+        public float turnSpeed;
+
+        //Private fields:
+        private int playerIndex;
+
+        // Start is called before the first frame update
+        void Start()
+        {
+            playerIndex = int.Parse(gameObject.tag.Substring(1, 1));
+        }
+
+        // Update is called once per frame
+        void Update()
+        {
+
+        }
+    }
+}

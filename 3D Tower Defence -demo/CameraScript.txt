@@ -1,0 +1,91 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace offline
+{
+    public class Offline_CameraScript : MonoBehaviour
+    {
+        //Public properties:
+
+        public List<Transform> players;
+
+        //Private properties
+        private Vector3 velPos;
+        private Vector3 velRot;
+        private Vector3 playersCenter;
+
+        private void Start()
+        {
+            foreach(Offline_PlayerInfo p in FindObjectsOfType<Offline_PlayerInfo>())
+            {
+                players.Add(p.transform);
+            }
+        }
+
+        private void FixedUpdate()
+        {
+            float playersCenterX = 0f;
+            float playersCenterZ = 0f;
+
+            float minX = float.MaxValue;
+            float maxX = float.MinValue;
+            float minZ = float.MaxValue;
+            float maxZ = float.MinValue;
+
+            for (int i = 0; i < players.Count; i++)
+            {
+                playersCenterX += players[i].position.x / players.Count;
+                playersCenterZ += players[i].position.z / players.Count;
+
+                if (players[i].position.x < minX)
+                {
+                    minX = players[i].position.x;
+                }
+                if (players[i].position.x > maxX)
+                {
+                    maxX = players[i].position.x;
+                }
+                if (players[i].position.z < minZ)
+                {
+                    minZ = players[i].position.z;
+                }
+                if (players[i].position.z > maxZ)
+                {
+                    maxZ = players[i].position.z;
+                }
+            }
+
+            //Calculates the center point of the players
+            playersCenter = new Vector3(
+                playersCenterX,
+                0.25f,
+                playersCenterZ
+                );
+
+            //Test the distance between the players
+            float xdist = maxX - minX;
+            float zdist = (maxZ - minZ) / 20;
+            float dist = (maxX - minX) / 20;
+            if (maxZ - minZ > maxX - minX)
+            {
+                dist = (maxZ - minZ) / 20;
+            }
+
+            //Makes the camera follow the center point of the players
+            this.transform.position = Vector3.SmoothDamp(
+                this.transform.position,
+                new Vector3(playersCenter.x, Mathf.Lerp(7f, 10f, dist), Mathf.Lerp(playersCenter.z - 6f, playersCenter.z - 12.5f, zdist)),
+                ref velPos,
+                0.3f
+                );
+
+            //Rotates the camera so that it always shows all of the player on screen.
+            this.transform.eulerAngles = Vector3.SmoothDamp(
+                this.transform.eulerAngles,
+                new Vector3(Mathf.Lerp(47f, 50f, dist), 0, 0),
+                ref velRot,
+                0.3f
+                );
+        }
+    }
+}

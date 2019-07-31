@@ -1,0 +1,77 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace offline
+{
+    public class Offline_EnemyAttackController : MonoBehaviour
+    {
+        //Public fields:
+
+        public bool cd = false;
+
+        //Private fields:
+        private bool attack = false;
+        [SerializeField] private Animator animator;
+        private BoxCollider boxCollider;
+        [SerializeField] private int attackPower;
+        // Start is called before the first frame update
+        void Start()
+        {
+            boxCollider = GetComponent<BoxCollider>();
+            animator = transform.parent.GetComponent<Animator>();
+            attackPower = 2;
+        }
+
+        // Update is called once per frame
+        void Update()
+        {
+
+        }
+
+        //Public methods:
+
+        public void Attack()
+        {
+            if (!animator.GetCurrentAnimatorStateInfo(0).IsName("Attack"))
+            {
+                animator.SetBool("attacking", true);
+                StartCoroutine(AttackCoroutine());
+            }
+        }
+
+        //Private methods:
+
+        private void OnCollisionEnter(Collision col)
+        {
+            if (col.gameObject.layer == 10)
+            {
+                print("PlayerHit!");
+                Offline_PlayerActionHandler p = col.gameObject.GetComponent<Offline_PlayerActionHandler>();
+                p.KnockPlayer(col.GetContact(0).normal * attackPower, attackPower);
+                boxCollider.enabled = false;
+            }
+            else if(col.gameObject.layer == 12)
+            {
+                print("Turret!");
+                Offline_BuildableController bc = col.gameObject.transform.GetComponent<Offline_BuildableController>();
+                bc.TakeDamage(attackPower);
+            }
+        }
+
+        IEnumerator AttackCoroutine()
+        {
+            yield return new WaitForSeconds(1f);
+            animator.SetBool("attacking", false);
+            boxCollider.enabled = true;
+            StartCoroutine(Cooldown(1f));
+        }
+
+        IEnumerator Cooldown(float s)
+        {
+            cd = true;
+            yield return new WaitForSeconds(s);
+            cd = false;
+        }
+    }
+}

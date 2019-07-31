@@ -1,0 +1,64 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace offline
+{
+    public class Offline_PlayerActionHandler : MonoBehaviour
+    {
+        //Private fields:
+        private int playerIndex;
+        private Offline_PlayerInfo playerInfo;
+        private Offline_GameController gc;
+        private Offline_UI_Controller uc;
+
+        // Start is called before the first frame update
+        void Start()
+        {
+            if(gameObject.tag == "p1")
+            {
+                playerIndex = 1;
+            }
+            else if(gameObject.tag == "p2")
+            {
+                playerIndex = 2;
+            }
+            playerInfo = GetComponent<Offline_PlayerInfo>();
+            gc = FindObjectOfType<Offline_GameController>();
+            uc = FindObjectOfType<Offline_UI_Controller>();
+        }
+
+        // Update is called once per frame
+        void Update()
+        {
+
+        }
+
+        //Public methods:
+
+        public void KnockPlayer(Vector3 dir, int dmg)
+        {
+            
+            if (playerInfo.hp - dmg > 0)
+            {
+                playerInfo.hp -= dmg;
+                uc.UpdatePlayerHp(playerIndex, playerInfo.hp);
+            }
+            else
+            {
+                playerInfo.hp = 0;
+                uc.UpdatePlayerHp(playerIndex, playerInfo.hp);
+                GetDestroyed();
+            }
+            
+        }
+
+        //Private methods:
+
+        //Handles the dying of this player-gameObject
+        private void GetDestroyed()
+        {
+            gc.GameOver();
+        }
+    }
+}

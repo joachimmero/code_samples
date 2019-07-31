@@ -1,0 +1,90 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.AI;
+
+namespace offline
+{
+    public class Offline_EnemySpawner : MonoBehaviour
+    {
+        //Private properties:
+        [SerializeField] Transform hub;
+        [SerializeField] GameObject[] enemies;
+        [SerializeField] int[] enemyTypes;
+
+        private int[][] waves;
+
+        private void Start()
+        {
+            waves = new int[][]
+            {
+            new int[]{ 1 },
+            new int[]{ 2, },
+            new int[]{ 3, 1 },
+            new int[]{ 5, 2 },
+            new int[]{ 5, 3 },
+            new int[]{ 7, 3 },
+            new int[]{ 7, 5 },
+            new int[]{ 9, 5 },
+            new int[]{ 11, 5 },
+            new int[]{ 11, 7 },
+            new int[]{ 13, 7 },
+            new int[]{ 13, 9 }
+            };
+        }
+        //Public methods:
+
+        public void SpawnWave(int round)
+        {
+            int waveIndex = round - 1;
+
+            if (round - 1 > waves.Length)
+            {
+                waveIndex = waves.Length - 1;
+            }
+
+            int enemyTypeCount = waves[waveIndex].Length;
+            enemyTypes = new int[5];
+            //Generate wave enemy array
+            for (int i = 0; i < 5; i++)
+            {
+                if (i < enemyTypeCount)
+                {
+                    enemyTypes[i] = waves[waveIndex][i];
+                }
+                else
+                {
+                    enemyTypes[i] = 0;
+                }
+            }
+
+            //Enemy minion
+            for (int i = 0; i < enemyTypes[0]; i++)
+            {
+                SpawnEnemy(enemies[0], new Vector3(UnityEngine.Random.Range(-45f, 45f), 0.25f, UnityEngine.Random.Range(-10, -5)));
+            }
+            //Enemy swordman
+            for (int i = 0; i < enemyTypes[1]; i++)
+            {
+                SpawnEnemy(enemies[1], new Vector3(UnityEngine.Random.Range(-45f, 45f), 0.25f, UnityEngine.Random.Range(-10, -5)));
+
+            }
+        }
+
+        //Private methods:
+
+        private void SpawnEnemy(GameObject e, Vector3 pos)
+        {
+            GameObject enemy = Instantiate(e, pos, Quaternion.identity);
+            NavMeshAgent agent = enemy.transform.Find("NavMeshAgent").gameObject.GetComponent<NavMeshAgent>();
+            Offline_EnemyController ec = enemy.AddComponent<Offline_EnemyController>();
+            ec.speed = 2f;
+            ec.agent = agent;
+            ec.hub = hub;
+            agent.radius = 0.5f;
+            agent.height = 1f;
+            agent.destination = hub.position;
+            agent.speed = 0f;
+        }
+    }
+}

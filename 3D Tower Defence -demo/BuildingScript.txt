@@ -1,0 +1,147 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace offline
+{
+    public class Offline_BuildingScript : MonoBehaviour
+    {
+        //Public properties:
+        public bool BuildableInHand
+        {
+            get
+            {
+                if (buildableInHand != null)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+
+        //Private fields:
+        private int playerIndex;
+        private bool buildMenuOpen = false;
+        private Vector2 input_move = Vector2.zero;
+        private Transform map;
+
+        //The buildable-object that the player is holding in his hand.
+        private Offline_Buildable buildableInHand;
+        private Offline_BuildingStore bs;
+        private Offline_ItemManager im;
+        private Offline_Movement mov;
+        private Offline_HubScript hub;
+        private Offline_UI_Controller uc;
+
+
+        // Start is called before the first frame update
+        void Start()
+        {
+            //Get the playerIndex from the gameObjects tag.
+            playerIndex = int.Parse(gameObject.tag.Substring(1, 1));
+            hub = FindObjectOfType<Offline_HubScript>();
+            map = GameObject.Find("map").transform;
+            im = GetComponent<Offline_ItemManager>();
+            mov = GetComponent<Offline_Movement>();
+            uc = FindObjectOfType<Offline_UI_Controller>();
+        }
+
+        // Update is called once per frame
+        void Update()
+        {
+            if(!buildMenuOpen)
+            {
+                if (!BuildableInHand)
+                {
+                    if (Input.GetButtonUp(gameObject.tag + "_buildmenu"))
+                    {
+                        if (Vector3.Distance(transform.position, hub.transform.position) < 2f)
+                        {
+                            bs = hub.OpenBuildMenu(playerIndex);
+                            buildMenuOpen = true;
+                            mov.enabled = false;
+                        }
+                    }
+                }
+                else
+                {
+                    if (Input.GetButtonUp(gameObject.tag + "_attack"))
+                    {
+                        PlaceBuildable();
+                    }
+                }
+            }
+            else
+            {
+                input_move.x = Input.GetAxis(gameObject.tag + "_horizontal");
+                input_move.y = Input.GetAxis(gameObject.tag + "_vertical");
+                if (input_move != Vector2.zero)
+                {
+                    int dir = 0;
+                    if (input_move.x < 0)
+                    {
+                        dir = 1;
+                    }
+                    else if (input_move.x > 0)
+                    {
+                        dir = 2;
+                    }
+                    else if (input_move.y > 0)
+                    {
+                        dir = 3;
+                    }
+                    else if (input_move.y < 0)
+                    {
+                        dir = 4;
+                    }
+                    bs.MoveCursor(playerIndex, dir);
+                }
+                if (Input.GetButtonUp(gameObject.tag + "_attack"))
+                {
+                    int buildablePrice = bs.SelectedBuildable.price;
+                    if(im.Resources >= buildablePrice)
+                    {
+                        buildableInHand = Instantiate(bs.SelectedBuildable.gameObject, new Vector3(transform.position.x, 0, transform.position.z) + transform.forward, Quaternion.identity, transform)
+                            .GetComponent<Offline_Buildable>();
+                        buildableInHand.owner = transform;
+                        im.Resources -= buildablePrice;
+                        uc.UpdateResources(playerIndex, im.Resources);
+                    }
+                    hub.CloseBuildMenu(playerIndex);
+                    buildMenuOpen = false;
+                    mov.enabled = true;
+                }
+                else if (Input.GetButtonUp(gameObject.tag + "_buildmenu"))
+                {
+                    hub.CloseBuildMenu(playerIndex);
+                    buildMenuOpen = false;
+                    mov.enabled = true;
+                }
+            }
+        }
+
+        //Public methods:
+        //Places the buildable that the player is holding in his hand, on the floor.
+        public void PlaceBuildable()
+        {
+            buildableInHand.transform.parent = map;
+            buildableInHand.GetComponent<CapsuleCollider>().enabled = true;
+            buildableInHand.transform.localScale = new Vector3(1, 1, 1);
+            buildableInHand = null;
+        }
+
+        //Private methods:
+
+
+        //Fixes a buildable.
+        private void FixBuildable()
+        {
+
+        }
+
+
+    }
+}

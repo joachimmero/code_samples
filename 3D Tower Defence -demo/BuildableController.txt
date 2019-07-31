@@ -1,0 +1,33 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace offline
+{
+    public class Offline_BuildableController : MonoBehaviour
+    {
+        //Private fields:
+        private Offline_Buildable b;
+
+        private void Start()
+        {
+            b = GetComponent<Offline_Buildable>();
+        }
+
+        //Public methods:
+
+        public void TakeDamage(int amount)
+        {
+            if(b.Hp - amount > 0)
+            {
+                print("Buildable taking damage!");
+                b.Hp -= amount;
+            }
+            else
+            {
+                print("Buildable got destroyed!");
+                Destroy(gameObject);
+            }
+        }
+    }
+}
