@@ -95,5 +95,9 @@ What I learnt:
 Quickly iterating different design ideas is a great style of working.
 Became better at designing different game-systems.
 
+Why it highlights my skillset:
+
+I am able to create different types of systems like the EnemySpawner and the BuildingStore + BuildingScript.
+I'm am capable of quickly create a demo of a game that can demostrate a games' core elements.
 
 

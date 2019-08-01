@@ -69,3 +69,17 @@ Room
 
 	A class that holds the information of a single room.
 
+My role:
+
+This is my thesis' project which I designed and programmed. 
+
+What I have learnt so far:
+
+I have learnt about how basic real-time networking works and how to convert objects and fields into bytes,
+which can be sent through a server. I have also learnt how to make a server, that would be more secure.
+
+Why it highlights my skillset:
+
+This is the first time, that I tried to create a real-time networking server. 
+I'm able to design and visualize complex systems in my head and then program them into existence.
+
